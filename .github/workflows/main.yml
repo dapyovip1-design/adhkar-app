@@ -27,7 +27,6 @@ jobs:
           mkdir -p extracted
           unzip -o islamic_adhkar_app.zip -d extracted/
           mkdir -p www_clean
-          # البحث عن أي ملف html داخل المستخرج
           HTML_FILE=$(find extracted -name "*.html" | head -n 1)
           if [ -z "$HTML_FILE" ]; then
             echo "Error: No HTML file found inside ZIP!"
@@ -35,7 +34,6 @@ jobs:
           fi
           SRC_DIR=$(dirname "$HTML_FILE")
           cp -r "$SRC_DIR"/* www_clean/
-          # إذا لم يكن هناك ملف index.html صريح، قم بإعادة تسمية أول ملف html إلى index.html
           if [ ! -f "www_clean/index.html" ]; then
             ORIGINAL_NAME=$(basename "$HTML_FILE")
             mv "www_clean/$ORIGINAL_NAME" "www_clean/index.html"
@@ -55,7 +53,7 @@ jobs:
       - name: Add Android Platform & Plugins
         run: |
           cd app_project
-          cordova platform add android@12.0.0
+          cordova platform add android@13.0.0
           cordova plugin add cordova-plugin-admob-plus --variable ADMOB_APP_ID="ca-app-pub-1781484420727259~4123799563"
 
       - name: Inject AdMob Script into index.html
