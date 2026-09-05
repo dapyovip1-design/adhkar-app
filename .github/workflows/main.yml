@@ -50,40 +50,18 @@ jobs:
           rm -rf www/*
           cp -r ../www_clean/* www/
 
-      - name: Add Android Platform & Plugins
+      - name: Add Android Platform
         run: |
           cd app_project
-          cordova platform add android@13.0.0
-          cordova plugin add cordova-plugin-admob-plus --variable ADMOB_APP_ID="ca-app-pub-1781484420727259~4123799563"
+          cordova platform add android@12.0.0
 
-      - name: Inject AdMob Script into index.html
+      - name: Inject Google AdSense / AdMob Web Script into index.html
         run: |
           cd app_project/www
-          cat << 'EOF' > admob_inject.js
-          document.addEventListener('deviceready', async function () {
-            try {
-              if (window.admob) {
-                const banner = new admob.BannerAd({
-                  adUnitId: 'ca-app-pub-1781484420727259/9060536678',
-                });
-                await banner.show();
-
-                const interstitial = new admob.InterstitialAd({
-                  adUnitId: 'ca-app-pub-1781484420727259/9338291749',
-                });
-                await interstitial.load();
-                await interstitial.show();
-              }
-            } catch (e) {
-              console.log('AdMob error:', e);
-            }
-          }, false);
-          EOF
-
           if grep -q "cordova.js" index.html; then
-            sed -i 's/<\/head>/<script src="admob_inject.js"><\/script><\/head>/g' index.html
+            sed -i 's/<\/head>/<script async src="https:\/\/pagead2.googlesyndication.com\/pagead\/js\/adsbygoogle.js?client=ca-app-pub-1781484420727259" crossorigin="anonymous"><\/script><\/head>/g' index.html
           else
-            sed -i 's/<\/head>/<script src="cordova.js"><\/script><script src="admob_inject.js"><\/script><\/head>/g' index.html
+            sed -i 's/<\/head>/<script src="cordova.js"><\/script><script async src="https:\/\/pagead2.googlesyndication.com\/pagead\/js\/adsbygoogle.js?client=ca-app-pub-1781484420727259" crossorigin="anonymous"><\/script><\/head>/g' index.html
           fi
 
       - name: Build Android App Bundle (AAB) & APK
