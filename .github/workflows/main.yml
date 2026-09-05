@@ -1,0 +1,97 @@
+name: Build Android AAB and APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Extract ZIP File
+        run: |
+          mkdir -p www
+          unzip -o islamic_adhkar_app.zip -d www/
+          # Ensure index.html is directly inside www folder
+          if [ ! -f www/index.html ]; then
+            SUBDIR=$(find www -maxdepth 2 -name "index.html" -exec dirname {} \;)
+            if [ -n "$SUBDIR" ]; then
+              cp -r $SUBDIR/* www/
+            fi
+          fi
+
+      - name: Install Cordova
+        run: |
+          npm install -g cordova
+
+      - name: Create Cordova Project
+        run: |
+          cordova create app_project com.adhkar.app "أذكار المسلم"
+          cd app_project
+          rm -rf www/*
+          cp -r ../www/* www/
+
+      - name: Add Android Platform & Plugins
+        run: |
+          cd app_project
+          cordova platform add android@12.0.0
+          cordova plugin add cordova-plugin-admob-plus --variable ADMOB_APP_ID="ca-app-pub-1781484420727259~4123799563"
+
+      - name: Inject AdMob Script into index.html
+        run: |
+          cd app_project/www
+          cat << 'EOF' > admob_inject.js
+          document.addEventListener('deviceready', async function () {
+            try {
+              if (window.admob) {
+                // 1. عرض إعلان البانر أسفل الشاشة
+                const banner = new admob.BannerAd({
+                  adUnitId: 'ca-app-pub-1781484420727259/9060536678',
+                });
+                await banner.show();
+
+                // 2. عرض الإعلان البيني عند فتح التطبيق
+                const interstitial = new admob.InterstitialAd({
+                  adUnitId: 'ca-app-pub-1781484420727259/9338291749',
+                });
+                await interstitial.load();
+                await interstitial.show();
+              }
+            } catch (e) {
+              console.log('AdMob error:', e);
+            }
+          }, false);
+          EOF
+          sed -i 's/<\/head>/<script src="cordova.js"><\/script><script src="admob_inject.js"><\/script><\/head>/g' index.html
+
+      - name: Build Android App Bundle (AAB) & APK
+        run: |
+          cd app_project
+          cordova build android --release -- --packageType=bundle
+          cordova build android --release -- --packageType=apk
+
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Release-AAB
+          path: app_project/platforms/android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Release-APK
+          path: app_project/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
