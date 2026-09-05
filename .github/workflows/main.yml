@@ -27,7 +27,8 @@ jobs:
           mkdir -p extracted
           unzip -o islamic_adhkar_app.zip -d extracted/
           mkdir -p www_clean
-          INDEX_PATH=$(find extracted -name "index.html" | head -n 1)
+          # البحث عن ملف index.html أو أي حالة أحرف مشابهة
+          INDEX_PATH=$(find extracted -iname "index.html" | head -n 1)
           if [ -z "$INDEX_PATH" ]; then
             echo "Error: index.html not found inside ZIP!"
             exit 1
@@ -55,6 +56,12 @@ jobs:
       - name: Inject AdMob Script into index.html
         run: |
           cd app_project/www
+          # العثور على اسم ملف الصفحة الرئيسية الفعلي بغض النظر عن حالة الأحرف
+          MAIN_HTML=$(find . -maxdepth 1 -iname "index.html" | head -n 1)
+          if [ -z "$MAIN_HTML" ]; then
+            MAIN_HTML="index.html"
+          fi
+          
           cat << 'EOF' > admob_inject.js
           document.addEventListener('deviceready', async function () {
             try {
@@ -75,10 +82,11 @@ jobs:
             }
           }, false);
           EOF
-          if grep -q "cordova.js" index.html; then
-            sed -i 's/<\/head>/<script src="admob_inject.js"><\/script><\/head>/g' index.html
+
+          if grep -q "cordova.js" "$MAIN_HTML"; then
+            sed -i 's/<\/head>/<script src="admob_inject.js"><\/script><\/head>/g' "$MAIN_HTML"
           else
-            sed -i 's/<\/head>/<script src="cordova.js"><\/script><script src="admob_inject.js"><\/script><\/head>/g' index.html
+            sed -i 's/<\/head>/<script src="cordova.js"><\/script><script src="admob_inject.js"><\/script><\/head>/g' "$MAIN_HTML"
           fi
 
       - name: Build Android App Bundle (AAB) & APK
