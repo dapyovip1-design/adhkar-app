@@ -22,17 +22,18 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Extract ZIP File
+      - name: Extract ZIP File & Prepare Web Content
         run: |
-          mkdir -p www
-          unzip -o islamic_adhkar_app.zip -d www/
-          # Ensure index.html is directly inside www folder
-          if [ ! -f www/index.html ]; then
-            SUBDIR=$(find www -maxdepth 2 -name "index.html" -exec dirname {} \;)
-            if [ -n "$SUBDIR" ]; then
-              cp -r $SUBDIR/* www/
-            fi
+          mkdir -p extracted
+          unzip -o islamic_adhkar_app.zip -d extracted/
+          mkdir -p www_clean
+          INDEX_PATH=$(find extracted -name "index.html" | head -n 1)
+          if [ -z "$INDEX_PATH" ]; then
+            echo "Error: index.html not found inside ZIP!"
+            exit 1
           fi
+          SRC_DIR=$(dirname "$INDEX_PATH")
+          cp -r "$SRC_DIR"/* www_clean/
 
       - name: Install Cordova
         run: |
@@ -43,7 +44,7 @@ jobs:
           cordova create app_project com.adhkar.app "أذكار المسلم"
           cd app_project
           rm -rf www/*
-          cp -r ../www/* www/
+          cp -r ../www_clean/* www/
 
       - name: Add Android Platform & Plugins
         run: |
@@ -58,13 +59,11 @@ jobs:
           document.addEventListener('deviceready', async function () {
             try {
               if (window.admob) {
-                // 1. عرض إعلان البانر أسفل الشاشة
                 const banner = new admob.BannerAd({
                   adUnitId: 'ca-app-pub-1781484420727259/9060536678',
                 });
                 await banner.show();
 
-                // 2. عرض الإعلان البيني عند فتح التطبيق
                 const interstitial = new admob.InterstitialAd({
                   adUnitId: 'ca-app-pub-1781484420727259/9338291749',
                 });
@@ -76,7 +75,11 @@ jobs:
             }
           }, false);
           EOF
-          sed -i 's/<\/head>/<script src="cordova.js"><\/script><script src="admob_inject.js"><\/script><\/head>/g' index.html
+          if grep -q "cordova.js" index.html; then
+            sed -i 's/<\/head>/<script src="admob_inject.js"><\/script><\/head>/g' index.html
+          else
+            sed -i 's/<\/head>/<script src="cordova.js"><\/script><script src="admob_inject.js"><\/script><\/head>/g' index.html
+          fi
 
       - name: Build Android App Bundle (AAB) & APK
         run: |
